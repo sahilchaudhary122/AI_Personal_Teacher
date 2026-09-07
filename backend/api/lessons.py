@@ -106,7 +106,8 @@ def create_lesson(request: LessonRequest, student: dict = Depends(get_current_st
                 "segments": [
                     segment.model_dump()
                     for segment in lesson.segments
-                ]
+                ],
+                "document_id": lesson.document_id
             },
         }
 

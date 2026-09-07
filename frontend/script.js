@@ -603,6 +603,7 @@ function displayAssessments(assessments) {
 
 // Global Lesson State
 let currentLesson = null;
+let currentDocumentId = null;
 
 // Display Previous Lessons
 function displayLessons(lessons) {
@@ -781,7 +782,10 @@ lessonForm.addEventListener(
                         },
 
                         body:
-                            JSON.stringify(requestBody)
+                            JSON.stringify({
+                                ...requestBody,
+                                document_id: currentDocumentId
+                            })
                     }
                 );
 
@@ -1468,3 +1472,32 @@ async function startApp() {
     await loadDashboard();
 }
 startApp();
+// Upload PDF
+const pdfUpload = document.getElementById("pdf-upload");
+const uploadBtn = document.getElementById("upload-btn");
+const uploadStatus = document.getElementById("upload-status");
+
+uploadBtn.addEventListener("click", async () => {
+    const file = pdfUpload.files[0];
+    if (!file) return;
+
+    uploadStatus.textContent = "Uploading...";
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch(`${API_BASE}/api/documents/upload`, {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) throw new Error("Upload failed");
+
+        const data = await response.json();
+        currentDocumentId = data.document_id;
+        uploadStatus.textContent = `Uploaded: ${data.filename}`;
+    } catch (error) {
+        console.error(error);
+        uploadStatus.textContent = "Upload failed.";
+    }
+});

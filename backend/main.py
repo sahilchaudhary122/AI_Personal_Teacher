@@ -18,6 +18,7 @@ from api.adaptive import router as adaptive_router
 from api import assessment
 from api import final_assessment
 from api import learning_path
+from api.documents import router as documents_router
 app = FastAPI(
     title="Personal AI Teacher API",
     description="Backend API for the Personal AI Teacher",
@@ -75,6 +76,7 @@ app.include_router(adaptive_router)
 app.include_router(assessment.router)
 app.include_router(final_assessment.router)
 app.include_router(learning_path.router)
+app.include_router(documents_router)
 
 if __name__ == "__main__":
     import uvicorn

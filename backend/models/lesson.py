@@ -10,6 +10,7 @@ class LessonRequest(BaseModel):
     language: Optional[str] = None
     learning_goal: str
     available_time_minutes: int = Field(gt=0, le=180)
+    document_id: Optional[str] = None
 
 class LessonSegment(BaseModel):
     type: str
@@ -29,3 +30,4 @@ class LessonPlan(BaseModel):
     total_duration_minutes: int
     learning_objectives: List[str]
     segments: List[LessonSegment]
+    document_id: Optional[str] = None

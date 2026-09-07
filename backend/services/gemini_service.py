@@ -13,7 +13,7 @@ client = genai.Client(api_key=api_key)
 
 def generate_response(prompt: str) -> str:
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-3.5-flash-lite",
         contents=prompt,
     )
 
@@ -37,7 +37,7 @@ def generate_json_response(prompt: str) -> str:
 
         try:
             response = client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-3.5-flash-lite",
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",
@@ -83,17 +83,30 @@ def generate_json_response(prompt: str) -> str:
         f"{max_attempts} attempts. "
         f"Last error: {last_error}"
     )
-    
+
+# ... (rest of imports)
+
 def create_lesson_plan(
     request: LessonRequest,
     student_context=None
 ) -> LessonPlan:
+    from services.rag_service import get_grounded_context
 
     if student_context is None:
         student_context = {}
 
+    rag_context = ""
+    if request.document_id:
+        rag = get_grounded_context(
+            query=f"Topic: {request.topic}, Learning goal: {request.learning_goal}",
+            document_id=request.document_id,
+        )
+        rag_context = rag.get("context", "")
+
     prompt = f"""
 You are an expert personalized AI teacher.
+
+{f"Use the following retrieved educational material to ground your lesson: {rag_context}" if rag_context else ""}
 
 Create a personalized learning lesson for the following student.
 
@@ -251,7 +264,7 @@ OUTPUT REQUIREMENT:
 """
 
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-3.5-flash-lite",
         contents=prompt,
         config={
             "response_mime_type": "application/json",
@@ -259,7 +272,9 @@ OUTPUT REQUIREMENT:
         },
     )
 
-    return response.parsed
+    lesson_plan = response.parsed
+    lesson_plan.document_id = request.document_id
+    return lesson_plan
 
 def translate_text(text: str, target_language: str) -> str:
     """

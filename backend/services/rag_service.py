@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 import pymupdf
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 
 from database.supabase_client import supabase
 from services.gemini_service import generate_response
@@ -86,7 +87,7 @@ def clean_text(text: str) -> str:
 
 def chunk_text(
     text: str,
-    chunk_size: int = 1200,
+    chunk_size: int = 2400,
     overlap: int = 200
 ) -> List[str]:
     """
@@ -140,7 +141,7 @@ def generate_embedding(text: str) -> List[float]:
         raise ValueError("Cannot embed empty text.")
 
     response = client.models.embed_content(
-        model="gemini-embedding-001",
+        model="gemini-embedding-2",
         contents=text,
         config={
             "output_dimensionality": 768
@@ -148,6 +149,37 @@ def generate_embedding(text: str) -> List[float]:
     )
 
     return response.embeddings[0].values
+
+
+def generate_embeddings(texts: List[str]) -> List[List[float]]:
+    """
+    Generate Gemini embeddings for multiple text chunks in a single API call.
+    Uses Content parts to ensure one-to-one mapping between input texts and output embeddings.
+    """
+    valid_texts = [t for t in texts if t.strip()]
+    if not valid_texts:
+        return []
+
+    # Construct one Content object with a Part per text for correct one-to-one mapping
+    contents = [
+        types.Content(
+            parts=[types.Part.from_text(text=text)]
+        )
+        for text in valid_texts
+    ]
+
+    response = client.models.embed_content(
+        model="gemini-embedding-2",
+        contents=contents,
+        config={
+            "output_dimensionality": 768
+        }
+    )
+
+    if not response.embeddings:
+        raise RuntimeError("Gemini did not return any embeddings.")
+
+    return [embedding.values for embedding in response.embeddings]
 
 
 # =========================================================
@@ -191,74 +223,63 @@ def store_document_chunks(
     document_id: str,
     pages: List[Dict[str, Any]]
 ) -> int:
-
-    rows = []
-
+    """
+    Chunk PDF pages, generate embeddings in batches, and store them in Supabase.
+    """
+    chunk_records = []
     chunk_index = 0
 
     for page in pages:
-
-        chunks = chunk_text(
-            page["text"]
-        )
+        chunks = chunk_text(page["text"])
 
         for chunk in chunks:
+            if not chunk.strip():
+                continue
 
-            embedding = generate_embedding(
-                chunk
-            )
-
-            rows.append({
+            chunk_records.append({
                 "document_id": document_id,
                 "content": chunk,
-                "embedding": embedding,
                 "page_number": page["page_number"],
                 "chapter": None,
                 "section": None,
                 "chunk_index": chunk_index
             })
-
             chunk_index += 1
 
-    if not rows:
+    if not chunk_records:
         return 0
 
-    # Insert in batches to avoid unnecessarily
-    # large API requests.
-    batch_size = 50
+    # Generate embeddings in batches to avoid excessive Gemini API requests.
+    embedding_batch_size = 50
 
+    for start_idx in range(0, len(chunk_records), embedding_batch_size):
+        batch = chunk_records[start_idx:start_idx + embedding_batch_size]
+        texts = [record["content"] for record in batch]
+        embeddings = generate_embeddings(texts)
+
+        if len(embeddings) != len(batch):
+            raise RuntimeError(
+                f"Embedding count mismatch: expected {len(batch)}, got {len(embeddings)}"
+            )
+
+        for record, embedding in zip(batch, embeddings):
+            record["embedding"] = embedding
+
+    # Insert into Supabase in batches.
+    insert_batch_size = 50
     inserted = 0
 
-    for start in range(
-        0,
-        len(rows),
-        batch_size
-    ):
-
-        batch = rows[
-            start:start + batch_size
-        ]
-
-        result = (
-            supabase
-            .table("document_chunks")
-            .insert(batch)
-            .execute()
-        )
+    for start_idx in range(0, len(chunk_records), insert_batch_size):
+        batch = chunk_records[start_idx:start_idx + insert_batch_size]
+        result = supabase.table("document_chunks").insert(batch).execute()
 
         if not result.data:
-            raise RuntimeError(
-                "Failed to store document chunks."
-            )
+            raise RuntimeError("Failed to store document chunks.")
 
         inserted += len(result.data)
 
     return inserted
 
-
-# =========================================================
-# COMPLETE PDF INGESTION
-# =========================================================
 
 def ingest_pdf(
     file_path: str,

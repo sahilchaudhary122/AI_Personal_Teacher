@@ -7,10 +7,11 @@ SAHIL_STUDENT_ID = "89c9c522-65c8-4743-99e2-60bc9d181a18"
 async def get_current_user(request: Request, authorization: str = Header(None)):
     # Development/Demo Bypass
     if not authorization:
-        # Check if the requested resource is for Sahil's dashboard OR lesson creation
+        # Check if the requested resource is for Sahil's dashboard OR lesson creation OR document upload
         if request.url.path in [
             f"/api/students/{SAHIL_STUDENT_ID}/dashboard",
-            "/api/lesson/create"
+            "/api/lesson/create",
+            "/api/documents/upload"
         ]:
             # Return a dummy user object for demo purposes
             class DummyUser:
@@ -29,8 +30,8 @@ async def get_current_user(request: Request, authorization: str = Header(None)):
 
 async def get_current_student(request: Request, student_id: str = None, user = Depends(get_current_user)):
     try:
-        # Dev Bypass: if request is for lesson creation, resolve Sahil as student
-        if request.url.path == "/api/lesson/create":
+        # Dev Bypass: if request is for lesson creation or document upload, resolve Sahil as student
+        if request.url.path in ["/api/lesson/create", "/api/documents/upload"]:
             resolved_student_id = SAHIL_STUDENT_ID
         else:
             resolved_student_id = student_id
