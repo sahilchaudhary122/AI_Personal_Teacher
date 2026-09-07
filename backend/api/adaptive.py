@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException
+import os
 from models.teacher_agent import TeacherAgentRequest
 from database.supabase_client import supabase
 from services.stt_service import transcribe_audio
+from services.tts_service import generate_speech
+from services.visual_service import generate_visual
 from services.teacher_agent_service import (
     get_teacher_next_step,
 )
@@ -190,7 +193,7 @@ def evaluate_answer(
                 misconception_description=result.get(
                     "misconception_description"
                 ),
-            )
+            ) or {}
 
             # -------------------------------------------------
             # Teacher Agent progression (Guardrails)
@@ -199,20 +202,20 @@ def evaluate_answer(
             next_action = result.get("next_action")
             score = result.get("score", 0)
             has_misconception = result.get("misconception", False)
-            mastery_score = concept_progress.get("mastery_score", 0)
-            status = concept_progress.get("status")
+            mastery_score = concept_progress.get("mastery_score", 0) if concept_progress else 0
+            status = concept_progress.get("status") if concept_progress else "new"
 
             # Deterministic Adaptation Guardrails
             if has_misconception or score < 40:
                 # Remedial path
                 if next_action not in {"REEXPLAIN", "SIMPLIFY", "ANALOGY"}:
                     next_action = "REEXPLAIN"
-            
+
             elif score < 70:
                 # Partial understanding path
                 if next_action not in {"EXAMPLE", "ANALOGY", "NEW_QUESTION", "SIMPLIFY"}:
                     next_action = "NEW_QUESTION"
-            
+
             elif score < 85 or status != "mastered":
                 # Moderate understanding path: Verify understanding
                 if next_action != "NEW_QUESTION":
@@ -221,12 +224,12 @@ def evaluate_answer(
                         "You're making progress! Let's check your understanding "
                         "with one more question before we move on."
                     )
-            
+
             else:
                 # Mastery path: NEXT_CONCEPT
                 if next_action != "NEXT_CONCEPT":
                     next_action = "CONTINUE" # Keep student on concept or allow NEXT_CONCEPT
-            
+
             result["next_action"] = next_action
 
             # 1. Concept mastered → move to next concept
@@ -247,17 +250,81 @@ def evaluate_answer(
                 )
 
             # 3. Adaptive actions are handled by /adapt
-            #
-            # Examples:
-            # SIMPLIFY
-            # REEXPLAIN
-            # ANALOGY
-            # EXAMPLE
-            # LOWER_DIFFICULTY
-            # INCREASE_DIFFICULTY
-            # NEW_QUESTION
+            adaptive_actions = {
+                "SIMPLIFY",
+                "REEXPLAIN",
+                "ANALOGY",
+                "EXAMPLE",
+                "LOWER_DIFFICULTY",
+                "INCREASE_DIFFICULTY",
+                "NEW_QUESTION",
+            }
 
-        return result
+            if next_action in adaptive_actions:
+                lesson_state = get_lesson_state(
+                    lesson_id=request.lesson_id,
+                    student_id=request.student_id,
+                )
+                adaptive_result = generate_adaptive_response(
+                    concept=request.concept,
+                    question=request.question,
+                    student_answer=request.student_answer,
+                    evaluation=result,
+                    language=language,
+                    difficulty=lesson_state.get("difficulty", "beginner"),
+                    subject=request.subject,
+                    topic=request.topic,
+                    document_id=request.document_id,
+                    lesson_state=lesson_state,
+                    student_id=request.student_id,
+                    lesson_id=request.lesson_id,
+                )
+
+                # Generate TTS for adaptive explanation
+                if adaptive_result and "explanation" in adaptive_result:
+                    try:
+                        audio_path = generate_speech(text=adaptive_result["explanation"])
+                        audio_filename = os.path.basename(audio_path)
+                        adaptive_result["audio_url"] = f"/media/{audio_filename}"
+                    except Exception as e:
+                        print(f"TTS generation failed: {e}")
+                        # Ensure audio_url remains None or not set
+                        adaptive_result["audio_url"] = None
+
+                    # Generate Visual for adaptive explanation
+                    try:
+                        visual_path = generate_visual(
+                            subject=request.subject,
+                            topic=request.topic,
+                            grade="10",
+                            concept=adaptive_result["concept"],
+                            style="educational diagram"
+                        )
+                        visual_filename = os.path.basename(visual_path)
+                        adaptive_result["visual_url"] = f"/media/{visual_filename}"
+                    except Exception as e:
+                        print(f"Visual generation failed: {e}")
+                        # Ensure visual_url remains None or not set
+                        adaptive_result["visual_url"] = None
+
+                # Robustly validate the adaptive response before including it
+                try:
+                    AdaptiveResponse(**adaptive_result)
+                    result["adaptive_response"] = adaptive_result
+                except Exception as e:
+                    print(f"Adaptive response validation failed: {e}")
+                    result["adaptive_response"] = None
+
+
+        # Explicitly validate the result against EvaluationResult
+        # Ensure mandatory fields are properly typed and non-null
+        result["misconception"] = bool(result.get("misconception", False))
+        result["score"] = float(result.get("score", 0.0))
+        result["correct"] = bool(result.get("correct", False))
+
+        return EvaluationResult(**result)
+
+
 
     except HTTPException:
         raise
@@ -464,7 +531,7 @@ def teacher_agent(
         # -----------------------------------------------------
         # Enrich the response
         # -----------------------------------------------------
-        
+
         if next_step.get("action") == "COMPLETE":
             next_step["language"] = language
             return next_step
@@ -507,7 +574,7 @@ def teacher_agent(
             status_code=500,
             detail=f"Teacher Agent failed: {str(e)}",
         )
-        
+
 # ============================================================
 # SPEECH ANSWER → STT → EVALUATION → ADAPTATION
 # ============================================================

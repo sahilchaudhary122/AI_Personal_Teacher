@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class AssessmentQuestion(BaseModel):
@@ -68,6 +68,7 @@ class FinalAssessmentEvaluationResponse(BaseModel):
     strengths: list[str]
     weaknesses: list[str]
     personalized_feedback: str
+    next_recommendation: Optional[Dict[str, Any]] = None
 
 
 class AssessmentReportResponse(BaseModel):

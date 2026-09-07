@@ -1,9 +1,15 @@
 import json
 from typing import Any, Dict
+from google.genai.errors import ClientError
 
 from services.gemini_service import generate_response
 from services.rag_service import get_grounded_context
 from services.concept_progress_service import get_concept_progress
+
+def _is_quota_exhausted(e: Exception) -> bool:
+    if isinstance(e, ClientError):
+        return getattr(e, "code", None) == 429 or getattr(e, "status_code", None) == 429
+    return "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
 
 VALID_ACTIONS = {
     "CONTINUE",
@@ -172,9 +178,23 @@ Return ONLY valid JSON:
 }}
 """
 
-    response = generate_response(prompt)
-
-    result = _extract_json(response)
+    try:
+        response = generate_response(prompt)
+        result = _extract_json(response)
+    except Exception as e:
+        if _is_quota_exhausted(e):
+            # Deterministic Fallback
+            result = {
+                "correct": False,
+                "score": 50,
+                "concept": concept,
+                "misconception": True,
+                "misconception_description": "Evaluation temporarily unavailable due to high demand.",
+                "feedback": "I'm having trouble evaluating your answer right now. Please try again or ask for an explanation.",
+                "next_action": "REEXPLAIN"
+            }
+        else:
+            raise
 
     result["concept"] = concept
 
@@ -381,6 +401,12 @@ If understanding is strong:
 - Increase difficulty where appropriate.
 - Continue to the next concept when ready.
 
+IMPORTANT GROUNDING RULES:
+- You MUST stay strictly within the scenario or context of the PREVIOUS QUESTION provided.
+- Do NOT introduce new scenarios, characters, or objects (e.g., changing from a swimmer to a football player) unless explicitly presenting a formal ANALOGY.
+- If presenting an ANALOGY, you MUST label it clearly as an "Analogy".
+- The explanation, example, and next_question MUST directly relate to the current topic and the student's previous answer.
+
 The student should feel like they are being taught by a real teacher.
 
 Choose ONE action:
@@ -408,9 +434,23 @@ Return ONLY valid JSON:
 }}
 """
 
-    response = generate_response(prompt)
-
-    result = _extract_json(response)
+    try:
+        response = generate_response(prompt)
+        result = _extract_json(response)
+    except Exception as e:
+        if _is_quota_exhausted(e):
+            # Deterministic Fallback
+            result = {
+                "action": "REEXPLAIN",
+                "concept": concept,
+                "strategy": "Re-explanation due to technical difficulty.",
+                "explanation": f"I'm sorry, I cannot fully adapt the explanation right now due to high demand, but remember that the concept of {concept} is key to understanding {topic}.",
+                "example": "Please review the learning material provided.",
+                "next_question": f"Can you summarize what you understand about {concept}?",
+                "difficulty": difficulty
+            }
+        else:
+            raise
 
     if result.get("action") not in VALID_ACTIONS:
         result["action"] = "REEXPLAIN"

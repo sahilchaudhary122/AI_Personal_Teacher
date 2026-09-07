@@ -45,14 +45,22 @@ def get_or_create_lesson_state(
     else:
         initial_concept = "Introduction"
 
-    return create_lesson_state(
-        lesson_id=lesson_id,
-        student_id=student_id,
-        subject=lesson.get("subject", "Unknown"),
-        topic=lesson.get("topic", "Unknown"),
-        current_concept=initial_concept,
-        difficulty=lesson.get("difficulty", "beginner"),
-    )
+    try:
+        return create_lesson_state(
+            lesson_id=lesson_id,
+            student_id=student_id,
+            subject=lesson.get("subject", "Unknown"),
+            topic=lesson.get("topic", "Unknown"),
+            current_concept=initial_concept,
+            difficulty=lesson.get("difficulty", "beginner"),
+        )
+    except Exception:
+        # If creation fails, check if another request created it in the meantime
+        state = get_lesson_state(lesson_id, student_id)
+        if state:
+            return state
+        # If still missing, it was a genuine failure
+        raise
 
 def create_lesson_state(
     lesson_id: str,

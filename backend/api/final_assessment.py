@@ -19,6 +19,7 @@ from models.final_assessment import (
 
 from services.gemini_service import generate_json_response
 from services.concept_progress_service import record_concept_answer
+from services.learning_path_service import generate_learning_path
 
 
 router = APIRouter(
@@ -963,6 +964,13 @@ Rules:
             )
 
         # ----------------------------------------------------
+        # Get next recommendation
+        # ----------------------------------------------------
+
+        learning_path = generate_learning_path(request.student_id)
+        next_recommendation = learning_path.get("next_recommendation")
+
+        # ----------------------------------------------------
         # Return evaluation
         # ----------------------------------------------------
 
@@ -979,6 +987,7 @@ Rules:
             strengths=strengths,
             weaknesses=weaknesses,
             personalized_feedback=feedback,
+            next_recommendation=next_recommendation,
         )
 
     except HTTPException:

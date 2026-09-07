@@ -93,6 +93,14 @@ const evaluationFeedback = document.getElementById("evaluation-feedback");
 const misconceptionText = document.getElementById("misconception-text");
 const nextStepButton = document.getElementById("next-step-button");
 
+// Language Selection
+const languageSelector = document.getElementById("language");
+
+function getSelectedLanguage() {
+    // Priority: Select value, or default to "English"
+    return languageSelector.value || "English";
+}
+
 // Get Next Teacher Step
 async function getTeacherNextStep(lessonId) {
     try {
@@ -105,7 +113,8 @@ async function getTeacherNextStep(lessonId) {
                 },
                 body: JSON.stringify({
                     student_id: STUDENT_ID,
-                    difficulty: "beginner" // Should probably be dynamic
+                    difficulty: "beginner",
+                    language: getSelectedLanguage()
                 })
             }
         );
@@ -127,7 +136,15 @@ submitAnswerButton.addEventListener("click", async () => {
     if (!answer) return;
 
     const lessonId = currentLesson.lesson_id;
-    const concept = currentLesson.segments[0].concept; // Simplified for now
+
+    // Safely retrieve the current concept, defaulting to topic if segments are missing
+    let concept = "Unknown Concept";
+    if (currentLesson.segments && currentLesson.segments.length > 0) {
+        concept = currentLesson.segments[0].concept || "Unknown Concept";
+    } else if (currentLesson.topic) {
+        concept = currentLesson.topic;
+    }
+
     const question = questionText.textContent;
 
     try {
@@ -142,7 +159,8 @@ submitAnswerButton.addEventListener("click", async () => {
                 student_answer: answer,
                 expected_answer: "...", // Need to get this from somewhere
                 subject: currentLesson.subject,
-                topic: currentLesson.topic
+                topic: currentLesson.topic,
+                language: getSelectedLanguage()
             })
         });
 
@@ -155,18 +173,77 @@ submitAnswerButton.addEventListener("click", async () => {
 });
 
 // Display Evaluation
+// Display Evaluation
 function displayEvaluation(result) {
     evaluationContainer.classList.remove("hidden");
     evaluationResult.textContent = result.correct ? "Correct!" : "Incorrect";
     evaluationFeedback.textContent = result.feedback;
-    
+
+    // Clear adaptive section
+    const adaptiveEl = document.getElementById("adaptive-section");
+    if (adaptiveEl) {
+        adaptiveEl.innerHTML = "";
+    }
+
+    if (result.adaptive_response) {
+        if (!adaptiveEl) {
+            // Create it if it doesn't exist
+            const section = document.createElement("div");
+            section.id = "adaptive-section";
+            evaluationContainer.appendChild(section);
+        }
+        const el = document.getElementById("adaptive-section");
+        el.innerHTML = `
+            <div class="adaptive-content" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
+                <p><strong>Teacher:</strong> I see where the confusion is. Let's look at it another way.</p>
+                <p><em>${escapeHTML(result.adaptive_response.explanation)}</em></p>
+                ${result.adaptive_response.example ? `<p><strong>Example:</strong> ${escapeHTML(result.adaptive_response.example)}</p>` : ""}
+                <div class="follow-up" style="margin-top: 10px; padding: 10px; background: #e9ecef; border-radius: 5px;">
+                    <p><strong>Follow-up Question:</strong> ${escapeHTML(result.adaptive_response.next_question)}</p>
+                </div>
+            </div>
+        `;
+        // Update main question text if follow-up exists
+        questionText.textContent = result.adaptive_response.next_question;
+
+        // Play audio if available
+        if (result.adaptive_response.audio_url) {
+            const container = document.createElement("div");
+            container.style.marginTop = "10px";
+            container.innerHTML = `<p><strong>🔊 Teacher Explanation:</strong></p>`;
+
+            const audioEl = document.createElement("audio");
+            audioEl.id = "adaptive-teacher-audio";
+            audioEl.controls = true;
+            audioEl.preload = "auto";
+            audioEl.src = `${API_BASE}${result.adaptive_response.audio_url}`;
+
+            container.appendChild(audioEl);
+            el.appendChild(container);
+
+            audioEl.load();
+            audioEl.play().catch(e => console.warn("Autoplay blocked:", e));
+        }
+
+        // Show visual if available
+        if (result.adaptive_response.visual_url) {
+            const visualEl = document.createElement("img");
+            visualEl.src = `${API_BASE}${result.adaptive_response.visual_url}`;
+            visualEl.alt = "Adaptive Educational Visual";
+            visualEl.style.marginTop = "10px";
+            visualEl.style.maxWidth = "100%";
+            visualEl.style.borderRadius = "5px";
+            el.appendChild(visualEl);
+        }
+    }
+
     if (result.misconception_description) {
         misconceptionText.textContent = `Misconception: ${result.misconception_description}`;
         misconceptionText.classList.remove("hidden");
     } else {
         misconceptionText.classList.add("hidden");
     }
-    
+
     nextStepButton.classList.remove("hidden");
 }
 
@@ -227,7 +304,7 @@ authForm.addEventListener("submit", async (e) => {
         }
 
         const data = await response.json();
-        
+
         // Handle token storage
         // Assuming response structure: { session: { access_token: "..." } } or similar
         const token = data.session?.access_token || data.access_token;
@@ -569,7 +646,7 @@ async function startLesson(lesson) {
         const response = await fetch(`${API_BASE}/api/lesson/${lesson.id}/state?student_id=${STUDENT_ID}`);
         if (!response.ok) throw new Error("Failed to load lesson state");
         const lessonState = await response.json();
-        
+
         currentLesson = { ...lesson, lesson_id: lesson.id, ...lessonState };
     } catch (e) {
         console.error("Error loading lesson state:", e);
@@ -587,8 +664,8 @@ async function startLesson(lesson) {
 
     // Get next step
     const step = await getTeacherNextStep(lesson.id);
-    if (step && step.question) {
-        questionText.textContent = step.question;
+    if (step && step.content && step.content.explanation) {
+        questionText.textContent = step.content.explanation;
     } else {
         questionText.textContent = "Teacher is ready. Please ask a question or await input.";
     }
@@ -971,9 +1048,9 @@ generateMediaButton.addEventListener(
 
         try {
 
-            
+
             // 1. Generate Visual
-            
+
 
             const firstSegment =
                 currentLesson.segments &&
@@ -1051,9 +1128,9 @@ generateMediaButton.addEventListener(
             );
 
 
-            
+
             // 2. Generate Speech
-            
+
 
             mediaStatus.textContent =
                 `Generating AI teacher voice in ${language}...`;
@@ -1164,9 +1241,9 @@ generateMediaButton.addEventListener(
             );
 
 
-            
+
             // 3. Generate Video
-            
+
 
 mediaStatus.textContent =
     "Creating AI animated lesson video...";

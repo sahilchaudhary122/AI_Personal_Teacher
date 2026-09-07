@@ -25,6 +25,7 @@ class EvaluationResult(BaseModel):
     misconception_description: Optional[str] = None
     feedback: str
     next_action: str
+    adaptive_response: Optional["AdaptiveResponse"] = None
 
 
 class AdaptRequest(BaseModel):
@@ -49,6 +50,8 @@ class AdaptiveResponse(BaseModel):
     example: Optional[str] = None
     next_question: str
     difficulty: str
+    audio_url: Optional[str] = None
+    visual_url: Optional[str] = None
 
 class SpeechAnswerRequest(BaseModel):
     lesson_id: Optional[str] = None
