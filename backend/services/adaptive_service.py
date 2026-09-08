@@ -76,6 +76,8 @@ def evaluate_student_answer(
     prompt = f"""
 You are an expert AI teacher and educational evaluator.
 
+IMPORTANT: Generate all written educational content in English. Use the student's preferred language ONLY for any speech, audio, or video narration instructions if explicitly requested.
+
 Evaluate the student's answer based on conceptual understanding.
 
 Do NOT use exact string matching.
@@ -288,6 +290,8 @@ def generate_adaptive_response(
     )
     prompt = f"""
 You are an adaptive AI teacher.
+
+IMPORTANT: Generate all written educational content in English. Use the student's preferred language ONLY for any speech, audio, or video narration instructions if explicitly requested.
 
 Your job is to decide how to teach the student NEXT.
 

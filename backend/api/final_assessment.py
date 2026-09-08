@@ -452,6 +452,8 @@ def generate_final_assessment(
         prompt = f"""
 You are an expert assessment designer for a personalized AI teacher.
 
+IMPORTANT: Generate all written educational content in English. Use the student's preferred language ONLY for any speech, audio, or video narration instructions if explicitly requested.
+
 Create a final assessment for a student who has completed a lesson.
 
 SUBJECT:
@@ -677,6 +679,8 @@ def evaluate_final_assessment(
 
             prompt = f"""
 You are an expert AI teacher evaluating a student's answer.
+
+IMPORTANT: Generate all written educational content in English. Use the student's preferred language ONLY for any speech, audio, or video narration instructions if explicitly requested.
 
 SUBJECT:
 {request.subject}
