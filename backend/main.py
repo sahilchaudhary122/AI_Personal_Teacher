@@ -25,7 +25,14 @@ app = FastAPI(
     version="1.0.0",
 )
 
-MEDIA_DIR = Path(__file__).resolve().parent / "media" / "generated"
+import os
+
+if os.getenv("VERCEL"):
+    MEDIA_DIR = Path("/tmp/media/generated")
+else:
+    MEDIA_DIR = Path(__file__).resolve().parent / "media" / "generated"
+
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount(
     "/media",
