@@ -13,12 +13,14 @@ if not api_key:
     raise ValueError("GEMINI_API_KEY is not configured.")
 
 client = genai.Client(api_key=api_key)
-
-MEDIA_DIR = (
-    Path(__file__).resolve().parent.parent
-    / "media"
-    / "generated"
-)
+if os.getenv("VERCEL"):
+    MEDIA_DIR = Path("/tmp/media/generated")
+else:
+    MEDIA_DIR = (
+        Path(__file__).resolve().parent.parent
+        / "media"
+        / "generated"
+    )
 
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 

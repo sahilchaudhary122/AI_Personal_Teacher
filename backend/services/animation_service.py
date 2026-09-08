@@ -28,10 +28,13 @@ client = Groq(api_key=GROQ_API_KEY)
 # ============================================================
 # DIRECTORIES
 # ============================================================
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-MEDIA_DIR = BASE_DIR / "media" / "generated"
+if os.getenv("VERCEL"):
+    MEDIA_DIR = Path("/tmp/media/generated")
+else:
+    MEDIA_DIR = BASE_DIR / "media" / "generated"
+
 ANIMATION_DIR = MEDIA_DIR / "animations"
 MANIM_MEDIA_DIR = ANIMATION_DIR / "manim_media"
 
