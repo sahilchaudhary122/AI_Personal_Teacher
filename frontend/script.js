@@ -1,25 +1,23 @@
 // Backend Configuration
-const API_PORTS = [8000, 8001];
-let API_BASE = "";
+const API_BASE = "https://ai-personal-teacher-api.vercel.app";
 
 // Initialize API
 async function initializeAPI() {
-    for (const port of API_PORTS) {
-        const url = `http://127.0.0.1:${port}`;
-        try {
-            const response = await fetch(`${url}/health`);
-            if (response.ok) {
-                API_BASE = url;
-                console.log(`Connected to backend on ${API_BASE}`);
-                return true;
-            }
-        } catch (e) {
-            console.warn(`Backend not found on port ${port}`);
+    try {
+        const response = await fetch(`${API_BASE}/health`);
+
+        if (response.ok) {
+            console.log(`Connected to backend on ${API_BASE}`);
+            return true;
         }
+
+        throw new Error(`Backend returned ${response.status}`);
+    } catch (e) {
+        console.error("Backend connection failed:", e);
+        showError("Could not connect to the backend API. Please try again later.");
+        loading.classList.add("hidden");
+        return false;
     }
-    showError("Could not connect to any backend API (tried ports 8000, 8001). Please ensure the backend is running.");
-    loading.classList.add("hidden");
-    return false;
 }
 
 // Your existing student UUID
@@ -1736,3 +1734,61 @@ function renderEvaluation(result) {
         </div>
     `;
 }
+
+
+// ============================================================
+// TOP NAVIGATION
+// UI-only navigation. Existing API, lesson, assessment, auth,
+// media, and dashboard logic above remains unchanged.
+// ============================================================
+
+(function initializeTopNavigation() {
+    const pageSections = {
+        home: "home-section",
+        "learning-path": "learning-path-view",
+        "my-learning": "my-learning-view",
+        lesson: "lesson-view",
+        "study-material": "study-material-view",
+        about: "about-view"
+    };
+
+    function showSection(sectionName) {
+        const targetId = pageSections[sectionName] || pageSections.home;
+
+        Object.values(pageSections).forEach((id) => {
+            const section = document.getElementById(id);
+            if (section) {
+                section.classList.toggle("hidden", id !== targetId);
+            }
+        });
+
+        document.querySelectorAll(".nav-item").forEach((item) => {
+            const isActive = item.dataset.section === sectionName;
+            item.classList.toggle("active", isActive);
+            item.setAttribute("aria-current", isActive ? "page" : "false");
+        });
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.querySelectorAll(".nav-item").forEach((item) => {
+        item.addEventListener("click", () => {
+            showSection(item.dataset.section);
+        });
+    });
+
+    const homeLogo = document.getElementById("home-logo");
+    if (homeLogo) {
+        homeLogo.addEventListener("click", () => showSection("home"));
+        homeLogo.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                showSection("home");
+            }
+        });
+    }
+
+    // Start on Home. Dashboard loading remains controlled by the
+    // existing startApp()/loadDashboard() flow.
+    showSection("home");
+})();
