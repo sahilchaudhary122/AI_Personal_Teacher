@@ -11,23 +11,43 @@
 
 <body>
 
-    <!-- Header -->
-    <header class="header">
-        <div>
-            <h1>Personal AI Teacher</h1>
-            <p>Your personalized learning dashboard</p>
+<!-- Top Navigation -->
+<header class="top-nav">
+    <div class="nav-brand" id="home-logo" title="Go to Home" role="button" tabindex="0">
+        <img src="media/logo.png" alt="AI Personal Teacher Logo">
+        <div class="brand-copy">
+            <strong>AI Personal Teacher</strong>
+            <span>Adaptive learning, built around you</span>
         </div>
+    </div>
 
+    <nav class="nav-menu" aria-label="Main navigation">
+        <button class="nav-item active" type="button" data-section="home">Home</button>
+        <button class="nav-item" type="button" data-section="learning-path">Learning Path</button>
+        <button class="nav-item" type="button" data-section="my-learning">My Learning</button>
+        <button class="nav-item" type="button" data-section="lesson">Lesson</button>
+        <button class="nav-item" type="button" data-section="study-material">Study Material</button>
+        <button class="nav-item" type="button" data-section="about">About Us</button>
+    </nav>
+
+    <div class="nav-actions">
         <div class="status">
             <span class="status-dot"></span>
-            AI Teacher
-            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <span>AI Teacher</span>
         </div>
-    </header>
+        <button
+            id="theme-toggle"
+            class="theme-toggle"
+            type="button"
+            title="Toggle light/dark mode"
+            aria-label="Toggle light/dark mode"
+        >🌙</button>
+    </div>
+</header>
 
 
     <!-- Login/Sign Up -->
-    <section id="auth-section" class="card">
+    <section id="auth-section" class="card hidden">
         <div class="section-title">
             <span>🔑</span>
             <h2 id="auth-title">Login</h2>
@@ -55,6 +75,16 @@
         <!-- Error -->
         <div id="error" class="error hidden"></div>
 
+
+        <section id="home-section" class="page-section">
+
+        <div class="home-welcome">
+            <div>
+                <span class="welcome-eyebrow">YOUR LEARNING DASHBOARD</span>
+                <h2>Welcome back to your learning journey</h2>
+                <p>Track your progress, review your learning history, and continue building your skills with your AI teacher.</p>
+            </div>
+        </div>
 
         <!-- Student Profile -->
         <section id="student-section" class="card hidden">
@@ -109,6 +139,10 @@
         </section>
 
 
+        </section>
+
+        <section id="study-material-view" class="page-section hidden">
+
         <!-- RAG Upload -->
         <section id="upload-section" class="card">
             <div class="section-title">
@@ -119,6 +153,10 @@
             <button id="upload-btn">Upload PDF</button>
             <p id="upload-status"></p>
         </section>
+
+        </section>
+
+        <section id="learning-path-view" class="page-section hidden">
 
         <!-- Learning Path -->
         <section id="learning-path-section" class="card hidden">
@@ -155,9 +193,13 @@
         </section>
 
 
+        </section>
+
+        <section id="my-learning-view" class="page-section hidden">
+
         <!-- Previous Lessons -->
         <section id="lessons-section" class="card hidden">
-            <details>
+        <details open>
                 <summary class="section-title">
                     <span>📚</span>
                     <h2>Previous Lessons</h2>
@@ -166,6 +208,10 @@
             </details>
         </section>
 
+
+        </section>
+
+        <section id="lesson-view" class="page-section hidden">
 
         <!-- Assessment UI -->
         <section id="assessment-ui" class="card hidden">
@@ -417,18 +463,200 @@
             </div>
 
         </section>
+        </section>
+
+        <section id="about-view" class="page-section hidden">
+            <section id="about-view" class="page-section">
+    <div class="about-container">
+
+        <div class="about-hero">
+            <span class="about-label">ABOUT THE PLATFORM</span>
+            <h1>Learning that adapts to you</h1>
+            <p>
+                AI Personal Teacher is an adaptive AI-powered learning platform
+                designed to make education more personalized, interactive, and
+                easier to understand.
+            </p>
+            <p>
+                Instead of giving every student the same lesson, the platform
+                adapts explanations, questions, and learning activities based
+                on the student's progress and responses.
+            </p>
+        </div>
+
+        <div class="about-grid">
+
+            <div class="about-card">
+                <div class="about-card-icon"></div>
+                <h2>1.Personalized Learning</h2>
+                <p>
+                    Lessons are generated around the student's subject, topic,
+                    learning level, goals, and available study time. This helps
+                    create a learning experience that is relevant to each
+                    student's needs.
+                </p>
+            </div>
+
+            <div class="about-card">
+                <div class="about-card-icon"></div>
+                <h2>2.Adaptive AI Teaching</h2>
+                <p>
+                    The AI teacher evaluates student responses and identifies
+                    areas where the student may be struggling. When an answer
+                    is incorrect, it can provide a different explanation,
+                    example, analogy, or follow-up question instead of simply
+                    showing the correct answer.
+                </p>
+            </div>
+
+            <div class="about-card">
+                <div class="about-card-icon"></div>
+                <h2>3.Grounded Learning</h2>
+                <p>
+                    Students can upload study material such as PDFs. The
+                    platform uses the provided learning content to support
+                    lesson generation, helping students learn from their own
+                    academic material.
+                </p>
+            </div>
+
+            <div class="about-card">
+                <div class="about-card-icon"></div>
+                <h2>4.Continuous Assessment</h2>
+                <p>
+                    Understanding is checked through questions and assessments.
+                    Student performance is used to track progress, identify
+                    strengths and weaknesses, and guide what should be learned
+                    next.
+                </p>
+            </div>
+
+            <div class="about-card">
+                <div class="about-card-icon">05</div>
+                <h2>Interactive Learning Media</h2>
+                <p>
+                    Difficult concepts can be supported with AI-generated
+                    visuals, teacher voice, and learning videos. Multiple
+                    forms of content make lessons more engaging and can help
+                    students understand concepts more clearly.
+                </p>
+            </div>
+
+            <div class="about-card">
+                <div class="about-card-icon">06</div>
+                <h2>Learning Progress</h2>
+                <p>
+                    The platform keeps track of completed lessons, assessment
+                    performance, and learning progress so students can
+                    understand where they are and continue learning from where
+                    they stopped.
+                </p>
+            </div>
+
+        </div>
+
+        <div class="about-how">
+            <div>
+                <span class="about-label">HOW IT WORKS</span>
+                <h2>From study material to personalized learning</h2>
+                <p>
+                    AI Personal Teacher combines student information,
+                    learning content, assessment results, and AI-generated
+                    teaching to create an adaptive learning cycle.
+                </p>
+            </div>
+
+            <div class="about-steps">
+
+                <div class="about-step">
+                    <span></span>
+                    <div>
+                        <h3>1.Understand the Student</h3>
+                        <p>
+                            The platform considers the student's learning
+                            preferences, subject, goals, and current progress.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="about-step">
+                    <span></span>
+                    <div>
+                        <h3>2. Create a Learning Path</h3>
+                        <p>
+                            Topics are organized into a structured learning
+                            path so students can progress step by step.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="about-step">
+                    <span></span>
+                    <div>
+                        <h3>3.Teach and Interact</h3>
+                        <p>
+                            The AI teacher explains concepts, asks questions,
+                            and responds to the student's understanding.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="about-step">
+                    <span></span>
+                    <div>
+                        <h3>4. Adapt and Improve</h3>
+                        <p>
+                            Student responses are used to provide additional
+                            explanations, follow-up questions, and guidance
+                            when needed.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="about-technology">
+            <span class="about-label">TECHNOLOGY</span>
+            <h2>Built with modern AI technology</h2>
+            <p>
+                The platform combines a FastAPI backend, Supabase for data and
+                authentication, Gemini for AI-powered teaching and content
+                generation, and retrieval-augmented learning for working with
+                uploaded study material.
+            </p>
+
+            <div class="tech-list">
+                <span>FastAPI</span>
+                <span>Supabase</span>
+                <span>Gemini AI</span>
+                <span>Adaptive AI</span>
+                <span>RAG</span>
+                <span>AI Visuals</span>
+                <span>Text-to-Speech</span>
+            </div>
+        </div>
+
+        <div class="about-footer">
+            <h2>Our goal</h2>
+            <p>
+                To make learning more personal, responsive, and accessible —
+                giving students an AI teacher that can explain concepts in
+                different ways and adapt as they learn.
+            </p>
+        </div>
+
+    </div>
+</section>
+        </section>
+
 
     </main>
 
 
     <!-- Footer -->
     <footer>
-
-        <p>
-            Personal AI Teacher • Powered by FastAPI,
-            Supabase & Gemini
-        </p>
-
+        <p>AI Personal Teacher · Powered by FastAPI, Supabase &amp; Gemini</p>
     </footer>
 
 
