@@ -34,3 +34,14 @@ def login(request: AuthRequest):
         return response.model_dump()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+@router.post("/refresh")
+def refresh_token(request: RefreshRequest):
+    try:
+        response = supabase.auth.refresh_session(request.refresh_token)
+        return response.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

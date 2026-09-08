@@ -120,6 +120,28 @@
             <p id="upload-status"></p>
         </section>
 
+        <!-- Learning Path -->
+        <section id="learning-path-section" class="card hidden">
+            <div class="section-title">
+                <span>🛣️</span>
+                <h2>Learning Path</h2>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="path-subject">Select Subject:</label>
+                <select id="path-subject">
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Biology">Biology</option>
+                    <option value="Computer Science">Computer Science</option>
+                </select>
+                <button id="generate-path-button">Generate Learning Path</button>
+            </div>
+
+            <div id="learning-path-container"></div>
+        </section>
+
         <!-- Assessments -->
         <section id="assessment-section" class="card hidden">
 
@@ -144,6 +166,22 @@
             </details>
         </section>
 
+
+        <!-- Assessment UI -->
+        <section id="assessment-ui" class="card hidden">
+            <div class="section-title">
+                <span>📝</span>
+                <h2>Final Assessment</h2>
+            </div>
+            <div id="assessment-questions"></div>
+            <button id="submit-assessment-button" class="hidden">Submit Assessment</button>
+        </section>
+
+        <!-- Assessment Results -->
+        <section id="assessment-results-ui" class="card hidden">
+            <div id="assessment-results-container"></div>
+            <button onclick="location.reload()">Back to Dashboard</button>
+        </section>
 
         <!-- Generate Personalized Lesson -->
         <section class="card lesson-generator">
@@ -283,6 +321,7 @@
                     <p id="evaluation-feedback"></p>
                     <p id="misconception-text" class="hidden"></p>
                     <button id="next-step-button" class="hidden">Next Step</button>
+                    <button id="start-assessment-button" class="hidden">Take Final Assessment</button>
                 </div>
             </div>
 

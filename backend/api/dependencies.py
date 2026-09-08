@@ -6,18 +6,19 @@ SAHIL_STUDENT_ID = "89c9c522-65c8-4743-99e2-60bc9d181a18"
 
 async def get_current_user(request: Request, authorization: str = Header(None)):
     # Development/Demo Bypass
-    if not authorization:
-        # Check if the requested resource is for Sahil's dashboard OR lesson creation OR document upload
-        if request.url.path in [
-            f"/api/students/{SAHIL_STUDENT_ID}/dashboard",
-            "/api/lesson/create",
-            "/api/documents/upload"
-        ]:
-            # Return a dummy user object for demo purposes
-            class DummyUser:
-                id = "demo-user-id"
-            return DummyUser()
-        
+    is_demo_path = request.url.path in [
+        f"/api/students/{SAHIL_STUDENT_ID}/dashboard",
+        f"/api/student/learning-path/{SAHIL_STUDENT_ID}",
+        "/api/lesson/create",
+        "/api/documents/upload"
+    ]
+
+    if is_demo_path:
+        # Return a dummy user object for demo purposes
+        class DummyUser:
+            id = "demo-user-id"
+        return DummyUser()
+
     # Normal Auth Flow
     try:
         if not authorization:
@@ -42,7 +43,7 @@ async def get_current_student(request: Request, student_id: str = None, user = D
         else:
             # Normal Auth Flow
             response = supabase.table("students").select("*").eq("id", resolved_student_id).eq("user_id", user.id).single().execute()
-            
+
         if not response.data:
             raise HTTPException(status_code=404, detail="Student not found or access denied")
         return response.data

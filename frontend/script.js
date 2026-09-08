@@ -306,10 +306,10 @@ authForm.addEventListener("submit", async (e) => {
         const data = await response.json();
 
         // Handle token storage
-        // Assuming response structure: { session: { access_token: "..." } } or similar
         const token = data.session?.access_token || data.access_token;
+        const refreshToken = data.session?.refresh_token || data.refresh_token;
         if (token) {
-            setAuthToken(token);
+            setAuthToken(token, refreshToken);
             alert(isLoginMode ? "Login successful!" : "Sign up successful! Please login.");
             if (isLoginMode) {
                 authSection.classList.add("hidden");
@@ -331,17 +331,67 @@ function getAuthToken() {
     return localStorage.getItem("auth_token");
 }
 
-function setAuthToken(token) {
+function setAuthToken(token, refreshToken = null) {
     localStorage.setItem("auth_token", token);
+    if (refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
+    }
+}
+
+function getRefreshToken() {
+    return localStorage.getItem("refresh_token");
 }
 
 function getAuthHeaders() {
-    const token = getAuthToken();
-    return {
-        "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
+    return { "Content-Type": "application/json" };
 }
+
+// Global Fetch Wrapper
+const originalFetch = window.fetch;
+window.fetch = async (url, options = {}) => {
+    const token = getAuthToken();
+    if (token) {
+        options.headers = { ...options.headers, "Authorization": `Bearer ${token}` };
+    }
+
+    let response = await originalFetch(url, options);
+
+    if (response.status === 401) {
+        console.log("AUTH: 401 Detected for:", url);
+        const refreshToken = getRefreshToken();
+        if (refreshToken) {
+            console.log("AUTH: Attempting Refresh");
+            const refreshResponse = await originalFetch(`${API_BASE}/api/auth/refresh`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+            if (refreshResponse.ok) {
+                console.log("AUTH: Refresh Success");
+                const data = await refreshResponse.json();
+                const newToken = data.session?.access_token || data.access_token;
+                const newRefresh = data.session?.refresh_token || data.refresh_token;
+                setAuthToken(newToken, newRefresh);
+
+                // Retry original request
+                options.headers["Authorization"] = `Bearer ${newToken}`;
+                console.log("AUTH: Retrying Request");
+                return await originalFetch(url, options);
+            } else {
+                console.log("AUTH: Refresh Failed");
+            }
+        } else {
+            console.log("AUTH: No Refresh Token Found");
+        }
+        // If refresh fails
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("refresh_token");
+        window.location.reload();
+    }
+    return response;
+};
+const learningPathSection = document.getElementById("learning-path-section");
+const learningPathContainer = document.getElementById("learning-path-container");
 
 // Load Dashboard
 async function loadDashboard() {
@@ -354,27 +404,22 @@ async function loadDashboard() {
 
         hideError();
 
-        const response = await fetch(
-            `${API_BASE}/api/students/${STUDENT_ID}/dashboard`,
-            {
-                headers: getAuthHeaders()
-            }
-        );
+        // Fetch dashboard
+        const dashboardResp = await fetch(`${API_BASE}/api/students/${STUDENT_ID}/dashboard`);
+        if (!dashboardResp.ok) throw new Error(`Dashboard request failed: ${dashboardResp.status}`);
 
-        if (!response.ok) {
-            throw new Error(
-                `Dashboard request failed: ${response.status}`
-            );
-        }
-
-
-        const data = await response.json();
+        const data = await dashboardResp.json();
 
         displayStudent(data.student);
         displayProgress(data.progress);
         displayAssessments(data.assessments);
-        displayLessons(data.lessons);
 
+        // Only auto-load Learning Path if no document is active.
+        if (!currentDocumentId) {
+            loadLearningPath();
+        }
+
+        displayLessons(data.lessons);
         loading.classList.add("hidden");
 
     } catch (error) {
@@ -642,6 +687,9 @@ function displayLessons(lessons) {
 
 // Start Lesson Demo
 async function startLesson(lesson) {
+    // Prevent default form submission if triggered inside a form
+    // (though startLesson is usually called from button clicks)
+
     // Fetch full lesson state to get segments
     try {
         const response = await fetch(`${API_BASE}/api/lesson/${lesson.id}/state?student_id=${STUDENT_ID}`);
@@ -654,14 +702,16 @@ async function startLesson(lesson) {
         currentLesson = { ...lesson, lesson_id: lesson.id, segments: [{concept: "Unknown"}] };
     }
 
-    // Hide dashboard sections
-    studentSection.classList.add("hidden");
-    progressSection.classList.add("hidden");
-    assessmentSection.classList.add("hidden");
-    lessonsSection.classList.add("hidden");
+    // Do NOT hide all sections permanently,
+    // just prepare the lesson area within the existing dashboard
+    // or just show the QA and media sections.
 
-    // Show QA section
+    // Show QA and media section
     qaSection.classList.remove("hidden");
+    mediaSection.classList.remove("hidden");
+
+    // Smooth scroll to the lesson area
+    qaSection.scrollIntoView({ behavior: 'smooth' });
 
     // Get next step
     const step = await getTeacherNextStep(lesson.id);
@@ -1496,8 +1546,193 @@ uploadBtn.addEventListener("click", async () => {
         const data = await response.json();
         currentDocumentId = data.document_id;
         uploadStatus.textContent = `Uploaded: ${data.filename}`;
+
+        // Infer subject from filename if it looks like a known subject
+        const filename = data.filename.toLowerCase();
+        let inferredSubject = "";
+        if (filename.includes("computer")) inferredSubject = "Computer Science";
+        else if (filename.includes("physics")) inferredSubject = "Physics";
+        else if (filename.includes("chem")) inferredSubject = "Chemistry";
+        else if (filename.includes("math")) inferredSubject = "Mathematics";
+        else if (filename.includes("bio")) inferredSubject = "Biology";
+
+        if (inferredSubject) {
+            pathSubject.value = inferredSubject;
+        }
+
+        // Trigger regeneration of learning path using the new document context and updated subject
+        loadLearningPath(pathSubject.value);
     } catch (error) {
         console.error(error);
         uploadStatus.textContent = "Upload failed.";
     }
 });
+
+const generatePathButton = document.getElementById("generate-path-button");
+const pathSubject = document.getElementById("path-subject");
+
+generatePathButton.addEventListener("click", () => {
+    loadLearningPath(pathSubject.value);
+});
+
+let latestRequestId = 0;
+
+async function loadLearningPath(subject) {
+    const requestId = ++latestRequestId;
+
+    try {
+        let url = `${API_BASE}/api/student/learning-path/${STUDENT_ID}`;
+        let params = new URLSearchParams();
+        if (subject) params.append("subject", subject);
+        if (currentDocumentId) params.append("document_id", currentDocumentId);
+
+        if (params.toString()) {
+            url += `?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) return;
+
+        // Check if this request is still the latest one
+        if (requestId !== latestRequestId) return;
+
+        const data = await response.json();
+        displayLearningPath(data);
+    } catch (error) {
+        console.error("Learning path error:", error);
+    }
+}
+
+function displayLearningPath(data) {
+    if (!data.learning_path || data.learning_path.length === 0) {
+        learningPathContainer.innerHTML = "<p>No learning path available yet.</p>";
+        return;
+    }
+
+    learningPathSection.classList.remove("hidden");
+    learningPathContainer.innerHTML = data.learning_path.map((lesson, index) => {
+        // Now using lesson_id directly from the API
+        const lessonId = lesson.lesson_id;
+
+        const buttonHtml = lessonId
+            ? `<button onclick='startLesson({id: "${lessonId}"})'>Start Lesson</button>`
+            : `<button disabled>No ID Available</button>`;
+
+        return `
+        <div class="lesson-item" style="margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <p><strong>${index + 1}. ${lesson.title || "Module " + (index + 1)}</strong></p>
+            <p><small>${lesson.subject || ""} - ${lesson.topic || ""}</small></p>
+            ${buttonHtml}
+        </div>
+    `;
+    }).join("");
+}
+
+// Assessment Flow
+const assessmentUI = document.getElementById("assessment-ui");
+const assessmentQuestions = document.getElementById("assessment-questions");
+const submitAssessmentButton = document.getElementById("submit-assessment-button");
+const assessmentResultsUI = document.getElementById("assessment-results-ui");
+const assessmentResultsContainer = document.getElementById("assessment-results-container");
+const startAssessmentButton = document.getElementById("start-assessment-button");
+
+let currentAssessment = null;
+
+if (startAssessmentButton) {
+    startAssessmentButton.addEventListener("click", async () => {
+        // Hide lesson UI, show assessment UI
+        document.querySelector(".lesson-generator").classList.add("hidden");
+        document.getElementById("qa-section").classList.add("hidden");
+        document.getElementById("media-section").classList.add("hidden");
+        assessmentUI.classList.remove("hidden");
+
+        const response = await fetch(`${API_BASE}/api/assessment/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                lesson_id: currentLesson.lesson_id,
+                student_id: STUDENT_ID,
+                subject: currentLesson.subject,
+                topic: currentLesson.topic,
+                language: getSelectedLanguage()
+            })
+        });
+        currentAssessment = await response.json();
+        renderAssessment(currentAssessment.questions);
+    });
+}
+
+function renderAssessment(questions) {
+    assessmentQuestions.innerHTML = questions.map((q, i) => `
+        <div class="question-item" data-index="${i}" style="margin-bottom: 20px;">
+            <p><strong>${i + 1}. ${escapeHTML(q.question)}</strong></p>
+            ${q.question_type === "mcq"
+                ? q.options.map(opt => `
+                    <label><input type="radio" name="q${i}" value="${opt}"> ${escapeHTML(opt)}</label><br>
+                `).join("")
+                : `<textarea name="q${i}" style="width: 100%;"></textarea>`
+            }
+        </div>
+    `).join("");
+    submitAssessmentButton.classList.remove("hidden");
+}
+
+submitAssessmentButton.addEventListener("click", async () => {
+    const answers = currentAssessment.questions.map((q, i) => {
+        let student_answer = "";
+        if (q.question_type === "mcq") {
+            const selected = document.querySelector(`input[name="q${i}"]:checked`);
+            student_answer = selected ? selected.value : "";
+        } else {
+            student_answer = document.querySelector(`textarea[name="q${i}"]`).value;
+        }
+        return {
+            question: q.question,
+            concept: q.concept,
+            student_answer: student_answer,
+            correct_answer: q.correct_answer
+        };
+    });
+
+    const response = await fetch(`${API_BASE}/api/assessment/evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            lesson_id: currentLesson.lesson_id,
+            student_id: STUDENT_ID,
+            subject: currentLesson.subject,
+            topic: currentLesson.topic,
+            answers: answers
+        })
+    });
+    const result = await response.json();
+    renderEvaluation(result);
+});
+
+function renderEvaluation(result) {
+    assessmentUI.classList.add("hidden");
+    assessmentResultsUI.classList.remove("hidden");
+
+    // Result object has 'overall_score', 'status', 'personalized_feedback', 'next_recommendation'
+    assessmentResultsContainer.innerHTML = `
+        <div class="card">
+            <h3>Assessment Complete</h3>
+            <p style="font-size: 1.25rem; font-weight: bold;">Score: ${result.overall_score}%</p>
+            <p><strong>Status:</strong> ${result.status}</p>
+
+            <div style="margin-top: 15px;">
+                <p><strong>Feedback:</strong></p>
+                <p>${escapeHTML(result.personalized_feedback)}</p>
+            </div>
+
+            ${result.next_recommendation ? `
+                <div class="next-step" style="margin-top: 15px; padding: 10px; background: #eef2ff; border-radius: 8px;">
+                    <p><strong>Recommended Next Step:</strong> ${result.next_recommendation.topic}</p>
+                    <p><small>${result.next_recommendation.reason}</small></p>
+                </div>
+            ` : ""}
+
+            <button onclick="location.reload()" style="margin-top: 20px;">Back to Dashboard</button>
+        </div>
+    `;
+}

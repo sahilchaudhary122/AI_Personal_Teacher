@@ -141,8 +141,19 @@ class SeenConcepts:
         return list(self._concepts)
 
 
+from typing import Any, Dict
+from difflib import SequenceMatcher
+from database.supabase_client import supabase
+from api.lessons import create_lesson
+from models.lesson import LessonRequest
+from fastapi import Request
+
 def generate_learning_path(
     student_id: str,
+    subject: str | None = None,
+    document_id: str | None = None,
+    student_context: dict | None = None,
+    language: str | None = None,
 ) -> Dict[str, Any]:
     """
     Generate a subject-aware personalized learning path.
@@ -178,7 +189,7 @@ def generate_learning_path(
         .table("lessons")
         .select(
             "id, subject, topic, title, difficulty, "
-            "learning_objectives, created_at"
+            "learning_objectives, created_at, lesson_content"
         )
         .eq("student_id", student_id)
         .order("created_at")
@@ -186,31 +197,91 @@ def generate_learning_path(
     )
 
     lessons = lessons_result.data or []
+    # Filter out lessons without content (segments)
+    lessons = [
+        lesson for lesson in lessons
+        if lesson.get("lesson_content") is not None
+        and isinstance(lesson.get("lesson_content"), dict)
+        and lesson.get("lesson_content").get("segments")
+    ]
 
     # ---------------------------------------------------------
     # 3. Determine target subject
     # ---------------------------------------------------------
 
-    target_subject = _infer_target_subject(
-        student.get("learning_goals"),
-        lessons,
-    )
+    # Use the provided subject if available, otherwise infer it.
+    if subject:
+        target_subject = subject
+    else:
+        target_subject = _infer_target_subject(
+            student.get("learning_goals"),
+            lessons,
+        )
 
     # ---------------------------------------------------------
     # 4. Filter lessons to target subject
     # ---------------------------------------------------------
 
-    if target_subject:
-        subject_lessons = [
-            lesson
-            for lesson in lessons
-            if (
-                lesson.get("subject", "").lower()
-                == target_subject.lower()
+    subject_lessons = [
+        lesson
+        for lesson in lessons
+        if (
+            lesson.get("subject", "").lower()
+            == target_subject.lower()
+        )
+    ]
+
+    # If no lessons exist for the subject, or we are grounding with a new document, create/ensure a valid lesson exists.
+    if not subject_lessons or document_id:
+        print(f"DEBUG: Need to ensure lesson exists for {target_subject}. Creating/Ensuring lesson with document_id={document_id}")
+        # Create a basic lesson request
+        lesson_req = LessonRequest(
+            subject=target_subject or "General",
+            topic=f"Introduction to {target_subject or 'General'}",
+            learning_goal=student.get("learning_goals") or "Learn",
+            available_time_minutes=30,
+            language=language or student.get("preferred_language") or "English",
+            student_name=student.get("name"),
+            grade=student.get("grade"),
+            current_level=student.get("current_level"),
+            document_id=document_id,
+        )
+        # Use existing create_lesson logic
+        try:
+            # We need to simulate the dependency injection of student
+            new_lesson = create_lesson(lesson_req, student=student)
+            print(f"DEBUG: Lesson ensured: {new_lesson.lesson_id}")
+            # Fetch the updated lessons list
+            lessons_result = (
+                supabase
+                .table("lessons")
+                .select(
+                    "id, subject, topic, title, difficulty, "
+                    "learning_objectives, created_at, lesson_content"
+                )
+                .eq("student_id", student_id)
+                .order("created_at")
+                .execute()
             )
-        ]
-    else:
-        subject_lessons = lessons
+            lessons = lessons_result.data or []
+            # Filter out lessons without content (segments)
+            lessons = [
+                lesson for lesson in lessons
+                if lesson.get("lesson_content") is not None
+                and isinstance(lesson.get("lesson_content"), dict)
+                and lesson.get("lesson_content").get("segments")
+            ]
+            subject_lessons = [
+                lesson
+                for lesson in lessons
+                if (
+                    lesson.get("subject", "").lower()
+                    == target_subject.lower()
+                )
+            ]
+            print(f"DEBUG: Found {len(subject_lessons)} subject_lessons after creation.")
+        except Exception as e:
+            print(f"Failed to auto-create lesson: {e}")
 
     # ---------------------------------------------------------
     # 5. Get concept progress
@@ -298,6 +369,7 @@ def generate_learning_path(
 
             learning_path.append(
                 {
+                    "lesson_id": lesson.get("id"),
                     "topic": objective,
                     "reason": reason,
                     "difficulty": difficulty,

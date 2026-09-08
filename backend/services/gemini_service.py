@@ -106,6 +106,8 @@ def create_lesson_plan(
     prompt = f"""
 You are an expert personalized AI teacher.
 
+IMPORTANT: Generate all written educational content in English. Use the student's preferred language ONLY for any speech, audio, or video narration instructions if explicitly requested.
+
 {f"Use the following retrieved educational material to ground your lesson: {rag_context}" if rag_context else ""}
 
 Create a personalized learning lesson for the following student.
