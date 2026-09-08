@@ -704,7 +704,10 @@ async function startLesson(lesson) {
     // just prepare the lesson area within the existing dashboard
     // or just show the QA and media sections.
 
-    // Show QA and media section
+    // Switch to the Lesson page
+    document.querySelector('.nav-item[data-section="lesson"]')?.click();
+
+    // Show QA and media sections
     qaSection.classList.remove("hidden");
     mediaSection.classList.remove("hidden");
 
